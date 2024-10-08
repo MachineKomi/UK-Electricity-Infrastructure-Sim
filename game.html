@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Electric Infrastructure Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Include Luxon for date handling -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1/build/global/luxon.min.js"></script>
+
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+    <!-- Include the Luxon adapter for Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0/dist/chartjs-adapter-luxon.min.js"></script>
+</head>
+<body>
+    <header class="top-bar">
+        <div class="date">📅 Date: January 1, 2025</div>
+        <div class="demand-indicators">📊 Min Demand: -- GW | Max Demand: -- GW | Total Generation Capacity: -- GW</div>
+        <div class="budget">💷 Budget: £18,000,000,000</div>
+    </header>
+
+    <main class="main-content">
+        <section class="notification-panel">
+            <div class="asset-management">
+                <h3>🏭 Infrastructure Assets</h3>
+                <!-- Asset details will be populated here -->
+            </div>
+            <div class="notification-log">
+                <h3>💬 Notification Log</h3>
+                <div class="notification-entries"></div>
+            </div>
+        </section>
+
+        <section class="main-panel">
+            <div class="graphs">
+                <canvas id="demand-capacity-chart"></canvas>
+            </div>
+            <div class="weather-display">🌡️ Temp: 20°C | 💨 Wind: 15 km/h | ☁️ Cloud Cover: 50%</div>
+            <div class="fuel-mix-chart">
+                ⚡ Fuel Mix Chart
+                <div class="emissions-display">🌍 Annualized Emissions: -- tons CO₂</div>
+                <canvas id="fuel-mix-chart"></canvas>
+            </div>
+        </section>
+
+        <aside class="sidebar">
+            <div class="purchase-menu">🛒 Purchase Menu</div>
+            <div class="construction-timers">🚧 Construction Timers</div>
+        </aside>
+    </main>
+
+    <!-- Moved JavaScript here to ensure DOM elements are loaded -->
+    <script>
+        (function () {
+            'use strict';
+
+            window.addEventListener('load', function () {
+                // Variables
+                let currentDate = new Date(2025, 0, 1);
+                let dayCounter = 0;
+                const dateElement = document.querySelector('.date');
+                const weatherElement = document.querySelector('.weather-display');
+                const demandElement = document.querySelector('.demand-indicators');
+                const budgetElement = document.querySelector('.budget');
+                const purchaseMenuElement = document.querySelector('.purchase-menu');
+                const constructionTimersElement = document.querySelector('.construction-timers');
+                const assetManagementElement = document.querySelector('.asset-management');
+                const notificationEntries = document.querySelector('.notification-entries');
+
+                const graphCanvas = document.getElementById('demand-capacity-chart');
+                const graphContext = graphCanvas.getContext('2d');
+
+                let minDemand = 19;
+                let maxDemand = 61;
+                let budget = 18000000000;
+                const assets = [];
+
+                // Weather variables
+                let currentTemperature;
+                let currentWindSpeed;
+                let currentCloudCover;
+                let currentSeason = '';
+
+                // Demand tracking variables
+                let previousMinDemand = minDemand;
+                let previousMaxDemand = maxDemand;
+
+                // Emissions factors
+                const emissionsFactors = {
+                    'Coal-fired Power Stations': 800, // tons of CO2 per GW per day
+                    'Gas-fired Power Stations': 400,
+                };
+
+                const startingAssets = {
+                    "Renewable": {
+                        "Wind Farms": { online: 800, total: 800, capacity: 0.038 },
+                        "Solar Farm": { online: 1000, total: 1000, capacity: 0.017 },
+                        "Hydroelectric Plants": { online: 200, total: 200, capacity: 0.025 },
+                        "Biomass Plants": { online: 3500, total: 3500, capacity: 0.010 },
+                    },
+                    "Fossil Fuel": {
+                        "Gas-fired Power Stations": { online: 40, total: 40, capacity: 0.9 },
+                        "Coal-fired Power Stations": { online: 0, total: 0, capacity: 0 },
+                    },
+                    "Clean Non-Renewable": {
+                        "Nuclear Power Plants": { online: 9, total: 9, capacity: 0.778 },
+                    },
+                    "Energy Storage": {
+                        "Pumped Storage": { online: 4, total: 4, capacity: 6.5 },
+                        "Battery Storage": { online: 100, total: 100, capacity: 0.02 },
+                        "Gravity Storage": { online: 1, total: 1, capacity: 0.004 },
+                    }
+                };
+
+                function createAsset(type, capacity, cost, buildTime, operationalCost, emissions) {
+                    return {
+                        type: type,
+                        capacity: capacity,
+                        cost: cost,
+                        buildTime: buildTime,
+                        operationalCost: operationalCost,
+                        emissions: emissions,
+                        status: 'planned',
+                        daysToComplete: buildTime
+                    };
+                }
+
+                const availableAssets = {
+                    "Renewable": [
+                        createAsset('Wind Farms', 0.038, 200000000, 180, 20000, 0),
+                        createAsset('Solar Farm', 0.017, 300000000, 120, 15000, 0),
+                        createAsset('Hydroelectric Plants', 0.025, 800000000, 365, 20000, 0),
+                        createAsset('Biomass Plants', 0.010, 600000000, 300, 30000, 100),
+                    ],
+                    "Fossil Fuel": [
+                        createAsset('Coal-fired Power Stations', 1.5, 1000000000, 365, 50000, 800),
+                        createAsset('Gas-fired Power Stations', 0.9, 1200000000, 365, 70000, 400),
+                    ],
+                    "Clean Non-Renewable": [
+                        createAsset('Nuclear Power Plants', 0.778, 5000000000, 1825, 100000, 20),
+                    ],
+                    "Energy Storage": [
+                        createAsset('Battery Storage', 0.02, 50000000, 90, 5000, 0),
+                        createAsset('Pumped Storage', 6.5, 1500000000, 730, 30000, 0),
+                        createAsset('Gravity Storage', 0.004, 1000000, 180, 10000, 0),
+                    ],
+                };
+
+                function initializePurchaseMenu() {
+                    purchaseMenuElement.innerHTML = '<h3>🛒 Purchase Menu</h3>';
+                    for (const category in availableAssets) {
+                        const categoryDiv = document.createElement('div');
+                        categoryDiv.classList.add('asset-category');
+                        categoryDiv.innerHTML = `<h4>${category}</h4>`;
+                        const fragment = document.createDocumentFragment();
+                        availableAssets[category].forEach((asset, index) => {
+                            const priceInMillions = (asset.cost / 1_000_000).toFixed(0);
+                            const capacityRounded = asset.capacity.toFixed(3);
+                            const assetButton = document.createElement('button');
+                            assetButton.textContent = `${asset.type} £${priceInMillions}m ${capacityRounded} GW`;
+                            assetButton.addEventListener('click', function () {
+                                purchaseAsset(category, index);
+                            });
+                            fragment.appendChild(assetButton);
+                        });
+                        categoryDiv.appendChild(fragment);
+                        purchaseMenuElement.appendChild(categoryDiv);
+                    }
+                }
+
+                function purchaseAsset(category, index) {
+                    const asset = availableAssets[category][index];
+                    if (budget >= asset.cost) {
+                        budget -= asset.cost;
+                        const newAsset = JSON.parse(JSON.stringify(asset));
+                        newAsset.status = 'under_construction';
+                        newAsset.daysToComplete = asset.buildTime;
+                        assets.push(newAsset);
+                        incrementAssetCounter(asset.type);
+                        logNotification(`🛢 Purchased ${asset.type} for £${asset.cost.toLocaleString()}. Construction started.`);
+                        updateBudget();
+                        updateAssetManagement();
+                        updateConstructionTimers();
+                    } else {
+                        logNotification(`❌ Not enough budget to purchase ${asset.type}.`);
+                    }
+                }
+
+                function incrementAssetCounter(type) {
+                    let found = false;
+                    for (const category in startingAssets) {
+                        if (startingAssets[category][type]) {
+                            startingAssets[category][type].total++;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        const category = getAssetCategory(type);
+                        if (category) {
+                            startingAssets[category][type] = { online: 0, total: 1, capacity: getAssetCapacity(type) };
+                        }
+                    }
+                }
+
+                function incrementOnlineAssetCounter(type) {
+                    let found = false;
+                    for (const category in startingAssets) {
+                        if (startingAssets[category][type]) {
+                            startingAssets[category][type].online++;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        const category = getAssetCategory(type);
+                        if (category) {
+                            startingAssets[category][type] = { online: 1, total: 1, capacity: getAssetCapacity(type) };
+                        }
+                    }
+                }
+
+                function getAssetCapacity(type) {
+                    for (const category in availableAssets) {
+                        for (const asset of availableAssets[category]) {
+                            if (asset.type === type) {
+                                return asset.capacity;
+                            }
+                        }
+                    }
+                    return 0;
+                }
+
+                function updateDate() {
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    dayCounter++;
+                    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                    const formattedDate = currentDate.toLocaleDateString('en-US', options);
+                    dateElement.textContent = `📅 Date: ${formattedDate}`;
+                    updateSeasonalChanges();
+                    updateWeather();
+                    updateDemand();
+                    updateAssets();
+                    updateBudget();
+
+                    if (currentDate.getDate() === 1) {
+                        budget += 600000000; // £600 million monthly income
+                        logNotification(`💷 Monthly income added: £600,000,000.`);
+                        updateBudget();
+                    }
+
+                    // Update the graph every day
+                    updateGraph();
+
+                    // Update other elements every day
+                    updateFuelMixChart();
+                    updateAssetManagement();
+                    updateConstructionTimers();
+                }
+
+                function updateSeasonalChanges() {
+                    const month = currentDate.getMonth();
+                    if (month >= 2 && month <= 4) {
+                        currentSeason = '🌸 Spring Season - Mild Weather';
+                    } else if (month >= 5 && month <= 7) {
+                        currentSeason = '☀️ Summer Season - Hot Weather';
+                    } else if (month >= 8 && month <= 10) {
+                        currentSeason = '🍂 Autumn Season - Cool Weather';
+                    } else {
+                        currentSeason = '❄️ Winter Season - Cold Weather';
+                    }
+                }
+
+                function updateWeather() {
+                    const month = currentDate.getMonth();
+                    let temperatureRange, windSpeedRange, cloudCoverRange;
+
+                    if (month >= 2 && month <= 4) {
+                        temperatureRange = [10, 20];
+                        windSpeedRange = [5, 15];
+                        cloudCoverRange = [20, 70];
+                    } else if (month >= 5 && month <= 7) {
+                        temperatureRange = [20, 35];
+                        windSpeedRange = [0, 10];
+                        cloudCoverRange = [10, 50];
+                    } else if (month >= 8 && month <= 10) {
+                        temperatureRange = [5, 15];
+                        windSpeedRange = [5, 15];
+                        cloudCoverRange = [30, 80];
+                    } else {
+                        temperatureRange = [-5, 10];
+                        windSpeedRange = [10, 20];
+                        cloudCoverRange = [40, 90];
+                    }
+
+                    if (currentTemperature === undefined) {
+                        currentTemperature = getRandomInRange(temperatureRange);
+                        currentWindSpeed = getRandomInRange(windSpeedRange);
+                        currentCloudCover = getRandomInRange(cloudCoverRange);
+                    } else {
+                        currentTemperature = nudgeValue(currentTemperature, temperatureRange, -2, 2);
+                        currentWindSpeed = nudgeValue(currentWindSpeed, windSpeedRange, -2, 2);
+                        currentCloudCover = nudgeValue(currentCloudCover, cloudCoverRange, -5, 5);
+                    }
+
+                    weatherElement.textContent = `${currentSeason} | 🌡️ Temp: ${currentTemperature}°C | 💨 Wind: ${currentWindSpeed} km/h | ☁️ Cloud Cover: ${currentCloudCover}%`;
+                }
+
+                function getRandomInRange(range) {
+                    const [min, max] = range;
+                    return getRandomInt(min, max);
+                }
+
+                function nudgeValue(currentValue, range, minNudge, maxNudge) {
+                    const nudge = getRandomInt(minNudge, maxNudge);
+                    let newValue = currentValue + nudge;
+                    const [min, max] = range;
+                    if (newValue < min) newValue = min;
+                    if (newValue > max) newValue = max;
+                    return newValue;
+                }
+
+                function updateDemand() {
+                    const demandGrowthRate = 0.05 / 365;
+
+                    minDemand *= (1 + demandGrowthRate);
+                    maxDemand *= (1 + demandGrowthRate);
+
+                    const randomFluctuationMin = getRandomInt(-2, 2);
+                    const randomFluctuationMax = getRandomInt(-2, 2);
+
+                    minDemand += randomFluctuationMin;
+                    maxDemand += randomFluctuationMax;
+
+                    minDemand = Math.max(minDemand, 10);
+                    maxDemand = Math.max(maxDemand, minDemand + 5);
+
+                    const daysSinceStart = Math.floor((currentDate - new Date(2025, 0, 1)) / (1000 * 60 * 60 * 24));
+                    const baseMinDemand = 19 * Math.pow(1 + demandGrowthRate, daysSinceStart);
+                    const baseMaxDemand = 61 * Math.pow(1 + demandGrowthRate, daysSinceStart);
+
+                    minDemand = Math.max(minDemand, baseMinDemand);
+                    maxDemand = Math.max(maxDemand, baseMaxDemand);
+
+                    minDemand = Math.round(minDemand * 100) / 100;
+                    maxDemand = Math.round(maxDemand * 100) / 100;
+
+                    const { totalCapacity } = calculateTotalGenerationCapacity();
+                    demandElement.textContent = `📊 Min Demand: ${minDemand} GW | Max Demand: ${maxDemand} GW | Total Generation Capacity: ${Math.round(totalCapacity * 100) / 100} GW`;
+
+                    previousMinDemand = minDemand;
+                    previousMaxDemand = maxDemand;
+                }
+
+                function updateAssets() {
+                    assets.forEach(asset => {
+                        if (asset.status === 'under_construction') {
+                            asset.daysToComplete -= 1;
+                            if (asset.daysToComplete <= 0) {
+                                asset.status = 'operational';
+                                incrementOnlineAssetCounter(asset.type);
+                                logNotification(`✅ ${asset.type} is now operational!`);
+                                updateAssetManagement(); // Update asset management display
+                            }
+                        }
+                    });
+                }
+
+                function updateBudget() {
+                    let operationalCost = 0;
+                    assets.forEach(asset => {
+                        if (asset.status === 'operational') {
+                            operationalCost += asset.operationalCost;
+                        }
+                    });
+
+                    // Check if budget can cover operational costs
+                    if (budget >= operationalCost) {
+                        budget -= operationalCost;
+                    } else {
+                        logNotification(`⚠️ Not enough budget to cover operational costs!`);
+                        budget = 0;
+                    }
+
+                    budgetElement.textContent = `💷 Budget: £${budget.toLocaleString()}`;
+                }
+
+                function updateAssetManagement() {
+                    assetManagementElement.innerHTML = '<h3>🏭 Infrastructure Assets</h3>';
+                    const fragment = document.createDocumentFragment();
+                    for (const category in startingAssets) {
+                        const categoryDiv = document.createElement('div');
+                        categoryDiv.classList.add('asset-category');
+                        categoryDiv.innerHTML = `<h4>${category}</h4>`;
+                        for (const assetType in startingAssets[category]) {
+                            const asset = startingAssets[category][assetType];
+                            const totalCapacityGW = (asset.online * asset.capacity).toFixed(2);
+                            const assetDiv = document.createElement('div');
+                            assetDiv.textContent = `${assetType} ${asset.online}/${asset.total}, ${totalCapacityGW} GW`;
+                            categoryDiv.appendChild(assetDiv);
+                        }
+                        fragment.appendChild(categoryDiv);
+                    }
+                    assetManagementElement.appendChild(fragment);
+                }
+
+                function updateConstructionTimers() {
+                    constructionTimersElement.innerHTML = '<h3>🚧 Construction Timers</h3>';
+                    const fragment = document.createDocumentFragment();
+                    assets.forEach(asset => {
+                        if (asset.status === 'under_construction') {
+                            const assetDiv = document.createElement('div');
+                            assetDiv.textContent = `${asset.type} - Days to Complete: ${asset.daysToComplete}`;
+                            fragment.appendChild(assetDiv);
+                        }
+                    });
+                    constructionTimersElement.appendChild(fragment);
+                }
+
+                function logNotification(message) {
+                    const maxNotifications = 100;
+                    const notification = document.createElement('div');
+                    notification.textContent = message;
+                    notificationEntries.insertBefore(notification, notificationEntries.firstChild);
+
+                    while (notificationEntries.childElementCount > maxNotifications) {
+                        notificationEntries.removeChild(notificationEntries.lastChild);
+                    }
+                }
+
+                function getRandomInt(min, max) {
+                    return Math.floor(Math.random() * (max - min + 1)) + min;
+                }
+
+                // Graph Initialization
+                const graphData = {
+                    datasets: [
+                        {
+                            label: 'Min Demand (GW)',
+                            data: [],
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Max Demand (GW)',
+                            data: [],
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Total Generation Capacity (GW)',
+                            data: [],
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                };
+
+                const demandCapacityChart = new Chart(graphContext, {
+                    type: 'line',
+                    data: graphData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '📈 Demand and Generation Capacity Over Time'
+                            },
+                            legend: {
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    displayFormats: {
+                                        day: 'MMM dd'
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Power (GW)'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                function updateGraph() {
+                    const date = currentDate.toISOString();
+
+                    const { totalCapacity } = calculateTotalGenerationCapacity();
+
+                    graphData.datasets[0].data.push({ x: date, y: minDemand });
+                    graphData.datasets[1].data.push({ x: date, y: maxDemand });
+                    graphData.datasets[2].data.push({ x: date, y: totalCapacity });
+
+                    const cutoffDate = luxon.DateTime.fromJSDate(currentDate).minus({ days: 90 });
+
+                    graphData.datasets.forEach(dataset => {
+                        dataset.data = dataset.data.filter(dataPoint => {
+                            const dataPointDate = luxon.DateTime.fromISO(dataPoint.x);
+                            return dataPointDate >= cutoffDate;
+                        });
+                    });
+
+                    demandCapacityChart.update();
+                }
+
+                function calculateTotalGenerationCapacity() {
+                    let totalEmissions = 0;
+                    let solarCapacity = 0;
+                    let windCapacity = 0;
+                    let otherRenewableCapacity = 0;
+                    let fossilFuelCapacity = 0;
+                    let cleanNonRenewableCapacity = 0;
+                    let windEfficiency = calculateWindEfficiency(currentWindSpeed);
+                    let solarEfficiency = (100 - currentCloudCover) / 100;
+
+                    // Include capacities from startingAssets
+                    for (const category in startingAssets) {
+                        for (const assetType in startingAssets[category]) {
+                            const asset = startingAssets[category][assetType];
+                            let capacity = asset.online * asset.capacity;
+
+                            if (category === 'Renewable') {
+                                if (assetType === 'Solar Farm') {
+                                    capacity *= solarEfficiency;
+                                    solarCapacity += capacity;
+                                } else if (assetType === 'Wind Farms') {
+                                    capacity *= windEfficiency;
+                                    windCapacity += capacity;
+                                } else {
+                                    otherRenewableCapacity += capacity;
+                                }
+                            } else if (category === 'Fossil Fuel') {
+                                fossilFuelCapacity += capacity;
+                                const emissionsPerGW = emissionsFactors[assetType] || 0;
+                                totalEmissions += capacity * emissionsPerGW;
+                            } else if (category === 'Clean Non-Renewable') {
+                                cleanNonRenewableCapacity += capacity;
+                            }
+                        }
+                    }
+
+                    // Include capacities from operational assets in 'assets' array
+                    assets.forEach(asset => {
+                        if (asset.status === 'operational') {
+                            let capacity = asset.capacity;
+                            const category = getAssetCategory(asset.type);
+
+                            if (category === 'Renewable') {
+                                if (asset.type === 'Solar Farm') {
+                                    capacity *= solarEfficiency;
+                                    solarCapacity += capacity;
+                                } else if (asset.type === 'Wind Farms') {
+                                    capacity *= windEfficiency;
+                                    windCapacity += capacity;
+                                } else {
+                                    otherRenewableCapacity += capacity;
+                                }
+                            } else if (category === 'Fossil Fuel') {
+                                fossilFuelCapacity += capacity;
+                                const emissionsPerGW = emissionsFactors[asset.type] || 0;
+                                totalEmissions += capacity * emissionsPerGW;
+                            } else if (category === 'Clean Non-Renewable') {
+                                cleanNonRenewableCapacity += capacity;
+                            }
+                        }
+                    });
+
+                    // Sum up total capacity without energy storage
+                    let totalCapacity = solarCapacity + windCapacity + otherRenewableCapacity + fossilFuelCapacity + cleanNonRenewableCapacity;
+
+                    // Calculate potential deficit due to weather affecting renewables
+                    const solarPotential = solarEfficiency > 0 ? solarCapacity / solarEfficiency : 0;
+                    const windPotential = windEfficiency > 0 ? windCapacity / windEfficiency : 0;
+                    const renewablePotential = solarPotential + windPotential + otherRenewableCapacity;
+                    const renewableDeficit = renewablePotential - (solarCapacity + windCapacity + otherRenewableCapacity);
+
+                    // Calculate energy storage contribution
+                    let energyStorageCapacity = 0;
+
+                    for (const category in startingAssets) {
+                        if (category === 'Energy Storage') {
+                            for (const assetType in startingAssets[category]) {
+                                const asset = startingAssets[category][assetType];
+                                energyStorageCapacity += asset.online * asset.capacity;
+                            }
+                        }
+                    }
+
+                    assets.forEach(asset => {
+                        if (asset.status === 'operational' && getAssetCategory(asset.type) === 'Energy Storage') {
+                            energyStorageCapacity += asset.capacity;
+                        }
+                    });
+
+                    // Energy storage offsets renewable deficit
+                    const energyStorageContribution = Math.min(renewableDeficit, energyStorageCapacity);
+
+                    // Add energy storage contribution to total capacity
+                    totalCapacity += energyStorageContribution;
+
+                    return {
+                        totalCapacity,
+                        totalEmissions,
+                        solarCapacity,
+                        windCapacity,
+                        otherRenewableCapacity,
+                        fossilFuelCapacity,
+                        cleanNonRenewableCapacity
+                    };
+                }
+
+                function calculateWindEfficiency(windSpeed) {
+                    if (windSpeed >= 25) {
+                        return 1.0;
+                    } else if (windSpeed >= 20) {
+                        return 0.75;
+                    } else if (windSpeed >= 15) {
+                        return 0.5;
+                    } else if (windSpeed >= 10) {
+                        return 0.25;
+                    } else {
+                        return 0.01; // Minimal efficiency to prevent division by zero
+                    }
+                }
+
+                // Fuel Mix Chart Initialization
+                const fuelMixCanvas = document.getElementById('fuel-mix-chart');
+                const fuelMixContext = fuelMixCanvas.getContext('2d');
+
+                const fuelMixData = {
+                    labels: ['Renewable', 'Fossil Fuel', 'Clean Non-Renewable'],
+                    datasets: [{
+                        label: '% of Total Generation Capacity',
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                };
+
+                const fuelMixChart = new Chart(fuelMixContext, {
+                    type: 'bar',
+                    data: fuelMixData,
+                    options: {
+                        indexAxis: 'y',
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: 'Percentage (%)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fuel Mix - Generation Capacity (%)'
+                            },
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+
+                function updateFuelMixChart() {
+                    const {
+                        totalCapacity,
+                        totalEmissions,
+                        solarCapacity,
+                        windCapacity,
+                        otherRenewableCapacity,
+                        fossilFuelCapacity,
+                        cleanNonRenewableCapacity
+                    } = calculateTotalGenerationCapacity();
+
+                    const renewableCapacity = solarCapacity + windCapacity + otherRenewableCapacity;
+
+                    const totalMixCapacity = renewableCapacity + fossilFuelCapacity + cleanNonRenewableCapacity;
+
+                    const renewablePercentage = (renewableCapacity / totalMixCapacity) * 100;
+                    const fossilFuelPercentage = (fossilFuelCapacity / totalMixCapacity) * 100;
+                    const cleanNonRenewablePercentage = (cleanNonRenewableCapacity / totalMixCapacity) * 100;
+
+                    fuelMixChart.data.datasets[0].data = [
+                        Math.round(renewablePercentage),
+                        Math.round(fossilFuelPercentage),
+                        Math.round(cleanNonRenewablePercentage)
+                    ];
+
+                    fuelMixChart.update();
+
+                    // Update emissions display
+                    const emissionsDisplay = document.querySelector('.emissions-display');
+                    const annualEmissions = Math.round(totalEmissions * 365);
+                    emissionsDisplay.textContent = `🌍 Annualized Emissions: ${annualEmissions.toLocaleString()} tons CO₂`;
+                }
+
+                function getAssetCategory(type) {
+                    for (const category in availableAssets) {
+                        for (const asset of availableAssets[category]) {
+                            if (asset.type === type) {
+                                return category;
+                            }
+                        }
+                    }
+                    for (const category in startingAssets) {
+                        if (startingAssets[category][type]) {
+                            return category;
+                        }
+                    }
+                    return null;
+                }
+
+                // Start the simulation
+                setInterval(updateDate, 500); // Update every 0.5 seconds
+                initializePurchaseMenu();
+                updateDate();
+                updateAssetManagement();
+                updateConstructionTimers();
+                updateFuelMixChart();
+
+            }); // Closes window.addEventListener('load', function () {
+
+        })(); // Closes the IIFE
+
+    </script>
+</body>
+</html>
+
+<style>
+    /* (Styles remain unchanged) */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        background-color: #f0f0f0;
+        color: #333;
+    }
+
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #444;
+        color: #fff;
+        padding: 15px;
+        font-weight: bold;
+        border-bottom: 2px solid #333;
+    }
+
+    .date {
+        flex: 1;
+    }
+
+    .demand-indicators {
+        flex: 2;
+        text-align: center;
+    }
+
+    .budget {
+        flex: 1;
+        text-align: right;
+    }
+
+    .main-content {
+        display: flex;
+        flex: 1;
+        padding: 20px;
+    }
+
+    .main-panel {
+        flex: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .graphs {
+        width: 100%;
+    }
+
+    .graphs canvas {
+        width: 100% !important;
+        max-width: 800px;
+        height: 400px;
+    }
+
+    .weather-display, .fuel-mix-chart {
+        text-align: center;
+        font-size: 1.2em;
+        padding: 10px;
+        background-color: #f0f0f0;
+        border-radius: 8px;
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .fuel-mix-chart canvas {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .notification-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        margin-right: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .notification-panel h3 {
+        margin-bottom: 15px;
+    }
+
+    .asset-management {
+        margin-bottom: 20px;
+    }
+
+    .asset-management h3 {
+        margin-bottom: 15px;
+    }
+
+    .notification-log {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 500px;
+    }
+
+    .notification-entries div {
+        margin-bottom: 5px;
+    }
+
+    .fuel-mix-chart .emissions-display {
+        margin-bottom: 10px;
+        font-size: 1em;
+        font-weight: bold;
+    }
+
+    .sidebar {
+        flex: 1;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin-left: 20px;
+    }
+
+    .purchase-menu {
+        margin-bottom: 20px;
+    }
+
+    .purchase-menu h3 {
+        margin-bottom: 15px;
+    }
+
+    .purchase-menu .asset-category {
+        margin-bottom: 15px;
+    }
+
+    .purchase-menu h4 {
+        margin-bottom: 10px;
+    }
+
+    .purchase-menu button {
+        display: block;
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 5px;
+        background-color: #444;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .purchase-menu button:hover {
+        background-color: #333;
+    }
+
+    .construction-timers {
+        margin-top: 20px;
+    }
+
+    .construction-timers h3 {
+        margin-bottom: 15px;
+    }
+
+    .construction-timers div {
+        margin-bottom: 10px;
+    }
+
+    .asset-category {
+        margin-bottom: 15px;
+    }
+
+    .asset-category h4 {
+        margin-bottom: 10px;
+    }
+
+    .asset-category div {
+        margin-bottom: 5px;
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            flex-direction: column;
+        }
+
+        .sidebar, .notification-panel {
+            margin-left: 0;
+            margin-top: 20px;
+            max-height: none;
+        }
+    }
+</style>
