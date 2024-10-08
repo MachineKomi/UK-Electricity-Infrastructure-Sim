@@ -83,18 +83,14 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 
 ## Screenshots
 
-Here are some screenshots of the **UK Electricity Infrastructure Sim**:
-
 ### Screenshot 1
-![Screenshot 001](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot001.PNG)
+![Screenshot 001](images/screenshots/screenshot001.PNG)
 
 ### Screenshot 2
-![Screenshot 002](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot002.PNG)
+![Screenshot 002](images/screenshots/screenshot002.PNG)
 
 ### Screenshot 3
-![Screenshot 003](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot003.PNG)
-
-
+![Screenshot 003](images/screenshots/screenshot003.PNG)
 
 ## Contributing
 Contributions are welcome! Please follow these steps:
