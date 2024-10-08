@@ -82,13 +82,18 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 - **Luxon**: Date and time manipulation library.
 
 ## Screenshots
+
 Here are some screenshots of the **UK Electricity Infrastructure Sim**:
+
 ### Screenshot 1
-![Screenshot 001](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot%20001.PNG)
+![Screenshot 001](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot001.PNG)
+
 ### Screenshot 2
-![Screenshot 002](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot%20002.PNG)
+![Screenshot 002](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot002.PNG)
+
 ### Screenshot 3
-![Screenshot 003](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot%20003.PNG)
+![Screenshot 003](UK-Electricity-Infrastructure-Sim/images/screenshots/screenshot003.PNG)
+
 
 
 ## Contributing
