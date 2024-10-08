@@ -23,6 +23,8 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 
 ### Installation
 
+#### Either
+
 1. **Clone the Repository**
 
    ```bash
@@ -37,7 +39,17 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 
 3. **Open the Game**
 
-   - Open the `index.html` file in your preferred web browser.
+   - Open the `game.html` file in your preferred web browser.
+
+#### Or 
+
+1. **Copy paste**
+
+   - Copy paste the code from game.html in this repo into notepad or your preferred code editor, and save the file as UK_Electricity_Infrastructure_Sim.html
+
+2. **Open the file**
+
+   - Open the file in your preferred web browser.
 
 ## How to Play
 
@@ -100,3 +112,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 - **Inspiration**: Real-world energy management and infrastructure planning scenarios.
+- **Cursor AI**: Making this was so much easier thanks to the Cursor code editor <3
+- **GPT o1**: GPT o1 helped to refine the design and implementation of most of the features. 
