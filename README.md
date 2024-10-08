@@ -4,6 +4,8 @@
 
 The **Electric Infrastructure Simulator** is an interactive web-based game that allows you to manage and expand an electric power grid. You can purchase various types of power generation assets, manage budgets, and respond to fluctuating demand and weather conditions. The goal is to balance power generation with demand while minimizing emissions and staying within budget.
 
+![Screenshot 001](images/screenshots/screenshot001.PNG)
+
 ## Features
 
 - **Dynamic Simulation**: Experience day-to-day operations with changing weather, seasons, and demand patterns.
@@ -81,15 +83,8 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 - **Chart.js**: Rendering dynamic graphs and charts.
 - **Luxon**: Date and time manipulation library.
 
-## Screenshots
-
-### Screenshot 1
-![Screenshot 001](images/screenshots/screenshot001.PNG)
-
-### Screenshot 2
+## More Screenshots
 ![Screenshot 002](images/screenshots/screenshot002.PNG)
-
-### Screenshot 3
 ![Screenshot 003](images/screenshots/screenshot003.PNG)
 
 ## Contributing
