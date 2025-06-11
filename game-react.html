@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Electric Infrastructure Simulator - React</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- React and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Luxon and Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0/dist/chartjs-adapter-luxon.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const DateTime = luxon.DateTime;
+
+        function randomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function App() {
+            const [currentDate, setCurrentDate] = useState(DateTime.local(2025, 1, 1));
+            const [minDemand, setMinDemand] = useState(19);
+            const [maxDemand, setMaxDemand] = useState(61);
+            const [temperature, setTemperature] = useState(20);
+            const [windSpeed, setWindSpeed] = useState(15);
+            const [cloudCover, setCloudCover] = useState(50);
+            const [budget, setBudget] = useState(18000000000);
+            const [notifications, setNotifications] = useState([]);
+            const [chart, setChart] = useState(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    advanceDay();
+                }, 500);
+                initChart();
+                return () => clearInterval(interval);
+            }, []);
+
+            function initChart() {
+                const ctx = chartRef.current.getContext('2d');
+                const newChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            { label: 'Min Demand', data: [], borderColor: 'blue', fill: false },
+                            { label: 'Max Demand', data: [], borderColor: 'red', fill: false }
+                        ]
+                    },
+                    options: {
+                        scales: {
+                            x: {
+                                type: 'timeseries',
+                                time: { unit: 'month' }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'GW' }
+                            }
+                        }
+                    }
+                });
+                setChart(newChart);
+            }
+
+            function log(message) {
+                setNotifications(n => [message, ...n.slice(0, 99)]);
+            }
+
+            function advanceDay() {
+                setCurrentDate(d => d.plus({ days: 1 }));
+                setBudget(b => b + (currentDate.day === 1 ? 600000000 : 0));
+                updateWeather();
+                updateDemand();
+                if (chart) {
+                    chart.data.datasets[0].data.push({ x: currentDate.toJSDate(), y: minDemand });
+                    chart.data.datasets[1].data.push({ x: currentDate.toJSDate(), y: maxDemand });
+                    chart.update('none');
+                }
+            }
+
+            function updateWeather() {
+                const temp = temperature + randomInt(-2, 2);
+                const wind = windSpeed + randomInt(-2, 2);
+                const cloud = Math.min(100, Math.max(0, cloudCover + randomInt(-5, 5)));
+                setTemperature(temp);
+                setWindSpeed(wind);
+                setCloudCover(cloud);
+            }
+
+            function updateDemand() {
+                const growthRate = 0.05 / 365;
+                const newMin = Math.max(10, (minDemand * (1 + growthRate)) + randomInt(-2, 2));
+                const newMax = Math.max(newMin + 5, (maxDemand * (1 + growthRate)) + randomInt(-2, 2));
+                setMinDemand(Math.round(newMin * 100) / 100);
+                setMaxDemand(Math.round(newMax * 100) / 100);
+            }
+
+            return (
+                <div className="app">
+                    <header className="top-bar">
+                        <div className="date">📅 Date: {currentDate.toLocaleString(DateTime.DATE_FULL)}</div>
+                        <div className="demand-indicators">📊 Min Demand: {minDemand} GW | Max Demand: {maxDemand} GW</div>
+                        <div className="budget">💷 Budget: £{budget.toLocaleString()}</div>
+                    </header>
+                    <main className="main-content">
+                        <section className="notification-panel">
+                            <h3>💬 Notification Log</h3>
+                            <div className="notification-entries">
+                                {notifications.map((n, i) => <div key={i}>{n}</div>)}
+                            </div>
+                        </section>
+                        <section className="main-panel">
+                            <div className="graphs">
+                                <canvas ref={chartRef}></canvas>
+                            </div>
+                            <div className="weather-display">🌡️ Temp: {temperature}°C | 💨 Wind: {windSpeed} km/h | ☁️ Cloud Cover: {cloudCover}%</div>
+                        </section>
+                    </main>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
+

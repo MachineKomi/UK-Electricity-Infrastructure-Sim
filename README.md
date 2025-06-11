@@ -40,6 +40,7 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 3. **Open the Game**
 
    - Open the `game.html` file in your preferred web browser.
+   - For a React-based experience open `game-react.html`.
 
 #### Or 
 
@@ -94,6 +95,7 @@ The **Electric Infrastructure Simulator** is an interactive web-based game that 
 - **JavaScript**: Core game logic and interactivity.
 - **Chart.js**: Rendering dynamic graphs and charts.
 - **Luxon**: Date and time manipulation library.
+- **React**: Modern component-based UI for `game-react.html`.
 
 ## More Screenshots
 ![Screenshot 002](images/screenshots/screenshot002.PNG)
